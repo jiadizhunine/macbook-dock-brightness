@@ -1,0 +1,6 @@
+.DS_Store
+build/
+*.log
+config.json
+state.json
+macbook-dock-brightness.plist

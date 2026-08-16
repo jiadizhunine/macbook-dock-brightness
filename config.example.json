@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "targetDisplay": {
+    "modelID": 5678,
+    "serialNumber": 0,
+    "vendorID": 1234
+  },
+  "brightness": {
+    "docked": 0,
+    "undocked": 0.32
+  },
+  "autoBrightness": {
+    "docked": false,
+    "undocked": true
+  },
+  "watchdogIntervalSeconds": 2
+}
