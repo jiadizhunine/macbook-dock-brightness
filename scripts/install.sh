@@ -185,6 +185,17 @@ stop_job() {
     fi
 }
 
+loaded_installation_is_restartable() {
+    MDB_CONFIG_PATH="$CONFIG_PATH" "$INSTALLED_BINARY" --validate-config >/dev/null 2>&1 || return 1
+    /usr/bin/plutil -lint "$LAUNCH_AGENT" >/dev/null 2>&1 || return 1
+    MDB_OLD_LABEL=$(/usr/bin/plutil -extract Label raw -o - "$LAUNCH_AGENT" 2>/dev/null) || return 1
+    MDB_OLD_PROGRAM=$(/usr/bin/plutil -extract ProgramArguments.0 raw -o - "$LAUNCH_AGENT" 2>/dev/null) || return 1
+    MDB_OLD_MODE=$(/usr/bin/plutil -extract ProgramArguments.1 raw -o - "$LAUNCH_AGENT" 2>/dev/null) || return 1
+    [ "$MDB_OLD_LABEL" = "$LABEL" ] &&
+        [ "$MDB_OLD_PROGRAM" = "$INSTALLED_BINARY" ] &&
+        [ "$MDB_OLD_MODE" = "--daemon" ]
+}
+
 restore_backup_file() {
     MDB_RESTORE_SOURCE=$1
     MDB_RESTORE_DESTINATION=$2
@@ -305,10 +316,20 @@ if [ "$OLD_JOB_WAS_LOADED" -eq 1 ] && [ "$OLD_HAD_PLIST" -ne 1 ]; then
     echo "The existing job is loaded but its LaunchAgent plist is missing; installation aborted." >&2
     exit 6
 fi
+if [ "$OLD_JOB_WAS_LOADED" -eq 1 ] && ! job_is_running; then
+    echo "The existing LaunchAgent is loaded but not running; installation was not changed." >&2
+    echo "Repair or uninstall the existing service before upgrading." >&2
+    exit 7
+fi
 if [ "$OLD_JOB_WAS_LOADED" -eq 1 ] && \
    { [ ! -x "$INSTALLED_BINARY" ] || [ ! -f "$CONFIG_PATH" ]; }; then
     echo "The existing job is running without a complete binary/configuration pair." >&2
     echo "Installation was not changed; repair the existing files before upgrading." >&2
+    exit 7
+fi
+if [ "$OLD_JOB_WAS_LOADED" -eq 1 ] && ! loaded_installation_is_restartable; then
+    echo "The running installation cannot be safely restarted from its on-disk files." >&2
+    echo "Installation was not changed; repair its config/plist before upgrading." >&2
     exit 7
 fi
 if [ -f "$STATE_PATH" ] && [ ! -x "$INSTALLED_BINARY" ]; then
