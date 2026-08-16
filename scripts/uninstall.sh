@@ -74,6 +74,12 @@ wait_for_job_unloaded() {
     done
 }
 
+if [ -f "$STATE_PATH" ] && [ ! -x "$INSTALLED_BINARY" ]; then
+    echo "Managed recovery state exists but its recovery binary is missing." >&2
+    echo "Uninstall was not changed; keep any running service and use the brightness-up key." >&2
+    exit 7
+fi
+
 if job_is_loaded; then
     if ! /bin/launchctl bootout "$USER_DOMAIN/$LABEL" || ! wait_for_job_unloaded; then
         echo "Could not stop the LaunchAgent; uninstall aborted without removing files." >&2

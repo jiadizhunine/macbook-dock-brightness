@@ -305,6 +305,17 @@ if [ "$OLD_JOB_WAS_LOADED" -eq 1 ] && [ "$OLD_HAD_PLIST" -ne 1 ]; then
     echo "The existing job is loaded but its LaunchAgent plist is missing; installation aborted." >&2
     exit 6
 fi
+if [ "$OLD_JOB_WAS_LOADED" -eq 1 ] && \
+   { [ ! -x "$INSTALLED_BINARY" ] || [ ! -f "$CONFIG_PATH" ]; }; then
+    echo "The existing job is running without a complete binary/configuration pair." >&2
+    echo "Installation was not changed; repair the existing files before upgrading." >&2
+    exit 7
+fi
+if [ -f "$STATE_PATH" ] && [ ! -x "$INSTALLED_BINARY" ]; then
+    echo "Managed recovery state exists but its recovery binary is missing." >&2
+    echo "Installation was not changed; keep any running service and use the brightness-up key." >&2
+    exit 7
+fi
 [ "$OLD_HAD_BINARY" -eq 0 ] || cp -p "$INSTALLED_BINARY" "$BACKUP_DIR/binary"
 [ "$OLD_HAD_CONFIG" -eq 0 ] || cp -p "$CONFIG_PATH" "$BACKUP_DIR/config.json"
 [ "$OLD_HAD_PLIST" -eq 0 ] || cp -p "$LAUNCH_AGENT" "$BACKUP_DIR/LaunchAgent.plist"

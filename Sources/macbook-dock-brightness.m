@@ -1171,17 +1171,19 @@ static void MDBPrintHelp(void) {
 
 static int MDBHandleDaemonStartupFailure(MDBConfig *config,
                                          NSString *reason,
-                                         BOOL restoreAvailable) {
+                                         BOOL fullRestoreSupport) {
     MDBLog([NSString stringWithFormat:@"Disabled: %@", reason]);
     if (!MDBManagedStateExists()) {
         return 0;
     }
-    if (!restoreAvailable) {
-        MDBLog(@"Managed recovery state remains; use the brightness key or --restore after repairing compatibility.");
-        return 69;
+    MDBLog(fullRestoreSupport ?
+        @"Managed recovery state exists; attempting a fail-open restore before exit." :
+        @"Private API support is incomplete; attempting each available restore operation before exit.");
+    if (MDBRestoreBuiltInDisplay(config)) {
+        return 0;
     }
-    MDBLog(@"Managed recovery state exists; attempting a fail-open restore before exit.");
-    return MDBRestoreBuiltInDisplay(config) ? 0 : 71;
+    MDBLog(@"Managed recovery state remains; use the brightness key or --restore after repairing compatibility.");
+    return fullRestoreSupport ? 71 : 69;
 }
 
 static int MDBRunDaemon(MDBConfig *config) {
@@ -1316,21 +1318,28 @@ int main(int argc, const char *argv[]) {
             }
             MDBLog(@"Invalid configuration found with managed recovery state; using the safe restore fallback.");
             NSString *failureReason = nil;
-            if (!MDBLoadPrivateDisplayAPIs(&failureReason)) {
-                MDBLog([NSString stringWithFormat:@"Emergency restore unavailable: %@",
+            BOOL fullRestoreSupport = MDBLoadPrivateDisplayAPIs(&failureReason);
+            if (!fullRestoreSupport) {
+                MDBLog([NSString stringWithFormat:@"Full emergency restore support is unavailable: %@",
                                                    failureReason]);
-                return 69;
             }
-            return MDBRestoreBuiltInDisplay(MDBSafeRestoreFallbackConfig()) ? 0 : 71;
+            if (MDBRestoreBuiltInDisplay(MDBSafeRestoreFallbackConfig())) {
+                return 0;
+            }
+            return fullRestoreSupport ? 71 : 69;
         }
         if ([command isEqualToString:@"--restore"]) {
             MDBConfig *restoreConfig = MDBLoadRestoreConfig();
             NSString *failureReason = nil;
-            if (!MDBLoadPrivateDisplayAPIs(&failureReason)) {
-                fprintf(stderr, "%s\n", failureReason.UTF8String);
-                return 69;
+            BOOL fullRestoreSupport = MDBLoadPrivateDisplayAPIs(&failureReason);
+            if (!fullRestoreSupport) {
+                fprintf(stderr, "%s\nAttempting each available restore operation.\n",
+                        failureReason.UTF8String);
             }
-            return MDBRestoreBuiltInDisplay(restoreConfig) ? 0 : 71;
+            if (MDBRestoreBuiltInDisplay(restoreConfig)) {
+                return 0;
+            }
+            return fullRestoreSupport ? 71 : 69;
         }
 
         MDBConfig *config = MDBLoadConfigOrPrintError();
